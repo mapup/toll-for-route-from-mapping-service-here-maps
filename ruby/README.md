@@ -14,70 +14,45 @@
   `REST APIs`
 
 
-With this in place, make a GET request: https://router.hereapi.com/v8/routes?transportMode=car&origin=${source.latitude},${source.longitude}&destination=${destination.latitude},${destination.longitude}&apiKey=${key}&return=polyline
+With this in place, make a GET request: https://router.hereapi.com/v8/routes?transportMode=car&origin=#{SOURCE[:latitude]},#{SOURCE[:longitude]}&destination=#{DESTINATION[:latitude]},#{DESTINATION[:longitude]}&apiKey=#{KEY}&return=polyline
 ### Note:
-* HERE accepts source and destination, as `:` seperated `${longitude,latitude}`.
-* HERE maps doesn't return us route as a `endoced polyline`, but as
+* HERE accepts source and destination, as `:` seperated `[:longitude,:latitude]`.
+* HERE maps doesn't return us route as a `encoded polyline`, but as
   `flexible polyline`, we will convert from `flexible polyline` to
-  `encoded polyline`.
-* Code to play with [`flexible polyline`](https://github.com/heremaps/flexible-polyline/tree/master/javascript)
-* Since at the time of writing this article this repo was not on npm so,
-  the index file is included as `flex_poly.js`
+  `encoded polyline`. HERE maps doesn't have support for flexible polyline gem in ruby
+* To decode `flexible polyline` we used HERE maps flexpolyline module and modified python script to make 
+  it work for ruby
 
-```javascript
-// JSON path "$..polyline"
-const getPoints = body => body.routes
-  .map(route => route.sections)
-  .reduce(flatten)
-  .map(x => x.polyline)
-  .map(x => flexPoly.decode(x))
-  .map(x => x.polyline)
-  .reduce(flatten)
+```ruby
+// Polyline from JSON
+polyline = json_parsed['routes'].map { |x| x['sections'] }.flatten(2). map { |y| y['polyline'] }.pop
+here_decoded = decode(polyline)
+google_encoded_polyline = FastPolylines.encode(here_decoded)
 ```
 
-```javascript
-const request = require("request");
-const polyline = require("polyline");
-const flexPoly = require("./flex_poly");
+```ruby
+require 'HTTParty'
+require 'json'
+require_relative 'flex_polyline'
+require "fast_polylines"
 
-// REST API key from Here maps
-const key = process.env.HEREMAP_KEY
-const tollguruKey = process.env.TOLLGURU_KEY;
+# Source Details in latitude-longitude pair (Dallas, TX - coordinates)
+SOURCE = {longitude: '-96.7970', latitude: '32.7767'}
+# Destination Details in latitude-longitude pair (New York, NY - coordinates)
+DESTINATION = {longitude: '-96.924', latitude: '32.9756' }
 
-// Dallas, TX
-const source = {
-    longitude: '-96.7970',
-    latitude: '32.7767',
-}
+# GET Request to HERE Maps for Polyline
+KEY = ENV['HERE_KEY']
+HERE_URL = "https://router.hereapi.com/v8/routes?transportMode=car&origin=#{SOURCE[:latitude]},#{SOURCE[:longitude]}&destination=#{DESTINATION[:latitude]},#{DESTINATION[:longitude]}&apiKey=#{KEY}&return=polyline"
+RESPONSE = HTTParty.get(HERE_URL).body
+json_parsed = JSON.parse(RESPONSE)
 
-// New York, NY
-const destination = {
-    longitude: '-74.0060',
-    latitude: '40.7128'
-};
-
-const url = `https://router.hereapi.com/v8/routes?transportMode=car&origin=${source.latitude},${source.longitude}&destination=${destination.latitude},${destination.longitude}&apiKey=${key}&return=polyline`;
-
-
-const head = arr => arr[0];
-const flatten = (arr, x) => arr.concat(x);
-
-// JSON path "$..points"
-const getPoints = body => body.routes
-  .map(route => route.sections)
-  .reduce(flatten)
-  .map(x => x.polyline)
-  .map(x => flexPoly.decode(x))
-  .map(x => x.polyline)
-  .reduce(flatten)
-
-const getPolyline = body => polyline.encode(getPoints(JSON.parse(body)));
-
-const getRoute = (cb) => request.get(url, cb);
-
-const handleRoute = (e, r, body) => console.log(getPolyline(body));
-
-getRoute(handleRoute);
+# Extracting HERE polyline from JSON
+polyline = json_parsed['routes'].map { |x| x['sections'] }.flatten(2). map { |y| y['polyline'] }.pop
+# Using flex_polyline decode method to get coordinates
+here_decoded = decode(polyline)
+# Converting coordinates to google polyline
+google_encoded_polyline = FastPolylines.encode(here_decoded)
 ```
 
 Note:
@@ -95,39 +70,15 @@ We need to send this route polyline to TollGuru API to receive toll information
 
 the last line can be changed to following
 
-```javascript
-
-const tollguruUrl = 'https://dev.tollguru.com/v1/calc/route';
-
-const handleRoute = (e, r, body) =>  {
-
-  const _polyline = getPolyline(body);
-  console.log(_polyline);
-
-  request.post(
-    {
-      url: tollguruUrl,
-      headers: {
-        'content-type': 'application/json',
-        'x-api-key': tollguruKey
-      },
-      body: JSON.stringify({
-        source: "here",
-        polyline: _polyline,
-        vehicleType: "2AxlesAuto",
-        departure_time: "2021-01-05T09:46:08Z"
-      })
-    },
-    (e, r, body) => {
-      console.log(e);
-      console.log(body)
-    }
-  )
-};
-getRoute(handleRoute);
+```ruby
+TOLLGURU_URL = 'https://dev.tollguru.com/v1/calc/route'
+TOLLGURU_KEY = ENV['TOLLGURU_KEY']
+headers = {'content-type' => 'application/json', 'x-api-key' => TOLLGURU_URL}
+body = {'source' => "here", 'polyline' => google_encoded_polyline, 'vehicleType' => "2AxlesAuto", 'departure_time' => "2021-01-05T09:46:08Z"}
+tollguru_response = HTTParty.post(TOLLGURU_URL,:body => body.to_json, :headers => headers)
 ```
 
-The working code can be found in index.js file.
+The working code can be found in main.rb file.
 
 ## License
 ISC License (ISC). Copyright 2020 &copy;TollGuru. https://tollguru.com/
