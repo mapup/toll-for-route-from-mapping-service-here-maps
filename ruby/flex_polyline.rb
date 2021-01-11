@@ -51,7 +51,7 @@ end
 
 def to_signed(value)
     #Decode the sign from an unsigned value
-    if value & 1
+    if (value & 1)!= 0
         value = ~value
     end
     value = (value >> 1)
