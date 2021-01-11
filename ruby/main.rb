@@ -24,6 +24,7 @@ google_encoded_polyline = FastPolylines.encode(here_decoded)
 # Sending POST request to TollGuru
 TOLLGURU_URL = 'https://dev.tollguru.com/v1/calc/route'
 TOLLGURU_KEY = ENV['TOLLGURU_KEY']
-headers = {'content-type' => 'application/json', 'x-api-key' => TOLLGURU_URL}
+headers = {'content-type' => 'application/json', 'x-api-key' => TOLLGURU_KEY}
 body = {'source' => "here", 'polyline' => google_encoded_polyline, 'vehicleType' => "2AxlesAuto", 'departure_time' => "2021-01-05T09:46:08Z"}
 tollguru_response = HTTParty.post(TOLLGURU_URL,:body => body.to_json, :headers => headers)
+a = 1
