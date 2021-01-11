@@ -24,7 +24,7 @@ With this in place, make a GET request: https://router.hereapi.com/v8/routes?tra
   it work for ruby
 
 ```ruby
-// Polyline from JSON
+# Polyline from JSON
 polyline = json_parsed['routes'].map { |x| x['sections'] }.flatten(2). map { |y| y['polyline'] }.pop
 here_decoded = decode(polyline)
 google_encoded_polyline = FastPolylines.encode(here_decoded)
