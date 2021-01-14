@@ -37,7 +37,7 @@ $source_longitude='-96.79448';
 $source_latitude='32.78165';
 $destination_longitude='-96.818';
 $destination_latitude='32.95399';
-$key = 'XG3D1wgroxSBF0IHXvECeDFpaL_H9diRkdj3SxQnnSo';
+$key = '';
 
 $url='https://router.hereapi.com/v8/routes?transportMode=car&origin='.$source_latitude.','.$source_longitude.'&destination='.$destination_latitude.','.$destination_longitude.'&apiKey='.$key.'&return=polyline';
 //connection...
