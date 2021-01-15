@@ -45,7 +45,7 @@ def get_rates_from_tollguru(polyline):
     params = {   
                 # explore https://tollguru.com/developers/docs/ to get best off all the parameter that tollguru offers 
                 'source': "here",
-                'polyline': polyline_from_heremaps ,         #  this is polyline that we fetched from the mapping service     
+                'polyline': polyline ,         #  this is polyline that we fetched from the mapping service     
                 'vehicleType': '2AxlesAuto',                #'''Visit https://tollguru.com/developers/docs/#vehicle-types to know more options'''
                 'departure_time' : "2021-01-05T09:46:08Z"   #'''Visit https://en.wikipedia.org/wiki/Unix_time to know the time format'''
                 }
