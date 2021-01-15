@@ -16,7 +16,7 @@
 
 With this in place, make a GET request: https://router.hereapi.com/v8/routes?transportMode=car&origin=#{SOURCE[:latitude]},#{SOURCE[:longitude]}&destination=#{DESTINATION[:latitude]},#{DESTINATION[:longitude]}&apiKey=#{KEY}&return=polyline
 ### Note:
-* HERE accepts source and destination, as `:` seperated `[:longitude,:latitude]`.
+* HERE accepts source and destination, as `:` seperated `[:longitude,:latitude]`. Using geocoding API we can convert string to lat-long pairs
 * HERE maps doesn't return us route as a `encoded polyline`, but as
   `flexible polyline`, we will convert from `flexible polyline` to
   `encoded polyline`. HERE maps doesn't have support for flexible polyline gem in ruby
@@ -36,13 +36,23 @@ require 'json'
 require_relative 'flex_polyline'
 require "fast_polylines"
 
-# Source Details in latitude-longitude pair (Dallas, TX - coordinates)
-SOURCE = {longitude: '-96.7970', latitude: '32.7767'}
-# Destination Details in latitude-longitude pair (New York, NY - coordinates)
-DESTINATION = {longitude: '-96.924', latitude: '32.9756' }
+START_LOC = "Dallas, TX"
+END_LOC = "New York, NY"
+KEY = ENV['HERE_KEY']
+
+def get_coord_hash(loc)
+    #GET Request to geocode API for coordinates
+    geocoding_url = "https://geocode.search.hereapi.com/v1/geocode?q=#{loc}&apiKey=#{KEY}"
+    coord = JSON.parse(HTTParty.get(geocoding_url).body)
+    return (coord['items'].pop)['position']
+end
+
+# Get source coordinates from Geocoding API
+source = get_coord_hash(START_LOC)
+# Get destination coordinates from Geocoding API
+destination = get_coord_hash(END_LOC)
 
 # GET Request to HERE Maps for Polyline
-KEY = ENV['HERE_KEY']
 HERE_URL = "https://router.hereapi.com/v8/routes?transportMode=car&origin=#{SOURCE[:latitude]},#{SOURCE[:longitude]}&destination=#{DESTINATION[:latitude]},#{DESTINATION[:longitude]}&apiKey=#{KEY}&return=polyline"
 RESPONSE = HTTParty.get(HERE_URL).body
 json_parsed = JSON.parse(RESPONSE)
