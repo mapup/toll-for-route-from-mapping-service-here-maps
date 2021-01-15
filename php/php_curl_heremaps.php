@@ -6,7 +6,7 @@ $source_longitude='-96.79448';
 $source_latitude='32.78165';
 $destination_longitude='-96.818';
 $destination_latitude='32.95399';
-$key = 'XG3D1wgroxSBF0IHXvECeDFpaL_H9diRkdj3SxQnnSo';
+$key = 'heremaps_api_key';
 
 $url='https://router.hereapi.com/v8/routes?transportMode=car&origin='.$source_latitude.','.$source_longitude.'&destination='.$destination_latitude.','.$destination_longitude.'&apiKey='.$key.'&return=polyline';
 //connection...
@@ -34,16 +34,11 @@ if ($err) {
 //extracting polyline from the JSON response..
 $data_heremaps = json_decode($response, true);
 
-//polyline extraction..
-$data_new = $data_heremaps['routes'];
-$new_data = $data_new['0'];
-$pol_data = $new_data['sections'];
-$pol_data_new = $pol_data['0'];
-//polyline..
-$polyline = $pol_data_new['polyline'];
+//flexible polyline extraction..
+$polyline = $data_heremaps['routes']['0']['section']['0']['polyline'];
 
 // encoding flexible polyline to encoded polyline
-// polyline_heremaps = `coded_will_be_added_soon`
+// polyline_heremaps = `@coded_will_be_added_soon`
 
 
 //using tollguru API..
@@ -75,7 +70,7 @@ CURLOPT_CUSTOMREQUEST => "POST",
 CURLOPT_POSTFIELDS => $encode_postData,
 CURLOPT_HTTPHEADER => array(
 				      "content-type: application/json",
-				      "x-api-key: 8hjbGhmFqP8HBQJ6NbMpT2FjRNhhtdgT"),
+				      "x-api-key: tollguru_api_key"),
 ));
 
 $response = curl_exec($curl);
@@ -90,7 +85,6 @@ if ($err) {
 }
 
 //response from tollguru..
-var_dump(json_decode($response, true));
-// $data = var_dump(json_decode($response, true));
-//print_r($data);
+$data = var_dump(json_decode($response, true));
+print_r($data);
 ?>
