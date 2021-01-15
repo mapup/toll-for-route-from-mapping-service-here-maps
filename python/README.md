@@ -24,10 +24,10 @@ With this in place, make a GET request: https://router.hereapi.com/v8/routes?tra
 
 ```python
 import flexpolyline as fp
-import polyline as Poly
+import polyline as poly
 
-polyline_here=response["routes"][0]["sections"][0]['polyline']  #this polyline is here map polypine , but we need google polyline to get Tollguru API working
-polyline=Poly.encode(fp.decode(polyline_here))                  #we decoded here polyline (flexpolyline) into coordinates and encoded that to google polyline
+flex_polyline_here=response["routes"][0]["sections"][0]['polyline']  #this polyline is here map polypine , but we need google polyline to get Tollguru API working
+polyline_from_heremap=Poly.encode(fp.decode(flex_polyline_here))                 #we decoded here polyline (flexpolyline) into coordinates and encoded that to google polyline
 
 ```
 
@@ -37,11 +37,11 @@ import json
 import requests
 import os
 import flexpolyline as fp
-import polyline as Poly
+import polyline as poly
 
 '''Fetching Polyline from Here Maps'''
 
-#API key for MapmyIndia
+#API key for Here Maps
 key=os.environ.get('Here_Maps_API_Key')
 
 #Source and Destination Coordinates
@@ -52,16 +52,15 @@ source_latitude='32.7767'
 destination_longitude='-74.0060'
 destination_latitude='40.7128'
 
-#Query MapmyIndia with Key and Source-Destination coordinates
+#Query Here Maps with Key and Source-Destination coordinates
 url='https://router.hereapi.com/v8/routes?transportMode=car&origin={a},{b}&destination={c},{d}&apiKey={e}&return=polyline'.format(a=source_latitude,b=source_longitude,c=destination_latitude,d=destination_longitude,e=key)
 
 #converting the response to json
-response=requests.get(url).json()
+response=requests.get(url).json()                               
    
 #Extracting polyline
-polyline_here=response["routes"][0]["sections"][0]['polyline']  #this polyline is here map polypine , but we need google polyline to get Tollguru API working
-polyline=Poly.encode(fp.decode(polyline_here))                  #we decoded here polyline (flexpolyline) into coordinates and encoded that to google polyline
-
+flex_polyline_here=response["routes"][0]["sections"][0]['polyline']  
+polyline_from_heremap=poly.encode(fp.decode(flex_polyline_here))     
 
 ```
 
@@ -81,7 +80,6 @@ We need to send this route polyline to TollGuru API to receive toll information
 the last line can be changed to following
 
 ```python
-
 '''Calling Tollguru API'''
 
 #API key for Tollguru
@@ -97,9 +95,9 @@ headers = {
           }
 params = {
             'source': "here",
-            'polyline': polyline ,                      #  this is polyline that we fetched from the mapping service     
-            'vehicleType': '2AxlesAuto',                #'''TODO - Need to provide users a slist of acceptable values for vehicle type'''
-            'departure_time' : "2021-01-05T09:46:08Z"   #'''TODO - Specify time formats'''
+            'polyline': polyline_from_heremap ,         #  this is polyline that we fetched from the mapping service     
+            'vehicleType': '2AxlesAuto',                #'''Visit https://tollguru.com/developers/docs/#vehicle-types to know more options'''
+            'departure_time' : "2021-01-05T09:46:08Z"   #'''Visit https://en.wikipedia.org/wiki/Unix_time to know the time format'''
         }
 
 #Requesting Tollguru with parameters
@@ -108,16 +106,16 @@ response_tollguru= requests.post(Tolls_URL, json=params, headers=headers).json()
 #checking for errors or printing rates
 if str(response_tollguru).find('message')==-1:
     print('\n The Rates Are ')
-    #extracting rates from Tollguru response is no error
-    print(*response_tollguru['summary']['rates'].items(),end="\n\n")
+    #extracting rates from Tollguru response if there's no error
+    print(*response_tollguru['route']['costs'].items(),end="\n\n")
 else:
     raise Exception(response_tollguru['message'])
 ```
 
-The working code can be found in index.js file.
+The working code can be found in Here_Maps.py file.
 
 ## License
-ISC License (ISC). Copyright 2020 &copy;TollGuru. https://tollguru.com/
+ISC License (ISC). Copyright 2020 &copy ;TollGuru. https://tollguru.com/
 
 Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
 
