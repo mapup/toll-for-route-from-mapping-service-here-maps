@@ -71,4 +71,8 @@ polyline_from_heremaps=get_polyline_from_here_maps(source_latitude,source_longit
 rates_from_tollguru=get_rates_from_tollguru(polyline_from_heremaps)
 
 #print a dictionary of rates for various available modes for this route
-print(f'The rates are \n {rates_from_tollguru}')
+#Print the rates of all the available modes of payment
+if rates_from_tollguru=={}:
+    print("The route doesn't have tolls")
+else:
+    print(f"The rates are \n {rates_from_tollguru}")
