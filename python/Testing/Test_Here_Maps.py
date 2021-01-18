@@ -9,7 +9,7 @@ key=os.environ.get('Here_Maps_API_Key')
 #API key for Tollguru
 Tolls_Key = os.environ.get('TollGuru_API_Key')
 
-'''Fetching geocodes form Here maps'''
+'''Fetching geocodes form here maps'''
 def get_geocodes_from_here_maps(address):
     url='https://geocoder.ls.hereapi.com/6.2/geocode.json'
     para={
@@ -45,7 +45,7 @@ def get_rates_from_tollguru(polyline):
     params = {   
                 # explore https://tollguru.com/developers/docs/ to get best off all the parameter that tollguru offers 
                 'source': "here",
-                'polyline': polyline,                       #  this is polyline that we fetched from the mapping service     
+                'polyline': polyline ,                      #  this is polyline that we fetched from the mapping service     
                 'vehicleType': '2AxlesAuto',                #'''Visit https://tollguru.com/developers/docs/#vehicle-types to know more options'''
                 'departure_time' : "2021-01-05T09:46:08Z"   #'''Visit https://en.wikipedia.org/wiki/Unix_time to know the time format'''
                 }
@@ -58,22 +58,41 @@ def get_rates_from_tollguru(polyline):
         return(response_tollguru['route']['costs'])
     else:
         raise Exception(response_tollguru['message'])
+
+
             
-'''Program Starts'''
-#Step 1 : Provide source and destination and get geocodes from heremaps
-source_latitude,source_longitude=get_geocodes_from_here_maps("Dallas, TX") 
-destination_latitude,destination_longitude=get_geocodes_from_here_maps("Newyork, NY")
+'''Testing'''
+#Importing Functions
+from csv import reader,writer
+temp_list=[]
+with open('testCases.csv','r') as f:
+    csv_reader=reader(f)
+    for count,i in enumerate(csv_reader):
+        #if count>2:
+        #  break
+        if count==0:
+            i.extend(("Polyline","TollGuru_Rates"))
+        else:
+            try:
+                source_latitude,source_longitude=get_geocodes_from_here_maps(i[1])
+                destination_latitude,destination_longitude=get_geocodes_from_here_maps(i[2])
+                polyline=get_polyline_from_here_maps(source_latitude,source_longitude,destination_latitude,destination_longitude)
+                i.append(polyline)
+            except:
+                i.append("Routing Error") 
+            
+            try:
+                rates=get_rates_from_tollguru(polyline)
+            except:
+                i.append(False)
+            if rates=={}:
+                i.append("NO_TOLL")
+            else:
+                i.append(rates['tag'])
+        #print(f"{len(i)}   {i}\n")
+        temp_list.append(i)
 
-#Step 2 : Get polyline for given source-destination route
-polyline_from_heremaps=get_polyline_from_here_maps(source_latitude,source_longitude,destination_latitude,destination_longitude)
+with open('testCases_result.csv','w') as f:
+    writer(f).writerows(temp_list)
 
-#Step 3 : Get rates from tollguru
-rates_from_tollguru=get_rates_from_tollguru(polyline_from_heremaps)
-
-#Print the rates of all the available modes of payment
-if rates_from_tollguru=={}:
-    print("The route doesn't have tolls")
-else:
-    print(f"The rates are \n {rates_from_tollguru}")
-
-'''Program Ends'''
+'''Testing Ends'''

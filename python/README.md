@@ -3,8 +3,8 @@
 ### Get API key to access HERE Maps APIs (if you have an API key skip this)
 #### Step 1: Login/Singup
 * Create an account to access [HERE Developer Portal](https://developer.here.com/)
-* Go to signup/login link https://developer.here.com/login
-* You will need to agree to HERE's Terms of Service https://legal.here.com/en-gb/terms
+* go to signup/login link https://developer.here.com/login
+* you will need to agree to HERE's Terms of Service https://legal.here.com/en-gb/terms
 
 #### Step 2: Getting your Key
 * Login to your HERE Maps Developer Portal
@@ -16,6 +16,13 @@
 #### Step 3: Getting Geocodes for source and destination from Here
 * Use the code below to call Here API to fetch geocodes for an address.
 ```python
+import json
+import requests
+import os
+
+#API key for Here Maps
+key=os.environ.get('Here_Maps_API_Key')
+
 def get_geocodes_from_here_maps(address):
     url='https://geocoder.ls.hereapi.com/6.2/geocode.json'
     para={
@@ -44,12 +51,15 @@ flex_polyline_here=response["routes"][0]["sections"][0]['polyline']     # herema
 polyline_from_heremaps=poly.encode(fp.decode(flex_polyline_here))       # we converted that to encoded(google) polyline
 return(polyline_from_heremaps)
 ```
-* To get polyline from soure and destination geocodes use the following function
 ```python
 import json
 import requests
 import flexpolyline as fp
 import polyline as poly
+import os
+
+#API key for Here Maps
+key=os.environ.get('Here_Maps_API_Key')
 
 def get_polyline_from_here_maps(source_latitude,source_longitude,destination_latitude,destination_longitude):
     #Query Here Maps with Key and Source-Destination coordinates
@@ -77,6 +87,13 @@ We need to send this route polyline to TollGuru API to receive toll information
 * Use the following function to get rates from TollGuru.
 
 ```python
+import json
+import requests
+import os
+
+#API key for Tollguru
+Tolls_Key = os.environ.get('TollGuru_API_Key')
+
 def get_rates_from_tollguru(polyline):
     #Tollguru querry url
     Tolls_URL = 'https://dev.tollguru.com/v1/calc/route'
@@ -89,7 +106,7 @@ def get_rates_from_tollguru(polyline):
     params = {   
                 # explore https://tollguru.com/developers/docs/ to get best off all the parameter that tollguru offers 
                 'source': "here",
-                'polyline': polyline ,         #  this is polyline that we fetched from the mapping service     
+                'polyline': polyline,                       #  this is polyline that we fetched from the mapping service     
                 'vehicleType': '2AxlesAuto',                #'''Visit https://tollguru.com/developers/docs/#vehicle-types to know more options'''
                 'departure_time' : "2021-01-05T09:46:08Z"   #'''Visit https://en.wikipedia.org/wiki/Unix_time to know the time format'''
                 }
@@ -99,7 +116,6 @@ def get_rates_from_tollguru(polyline):
     
     #checking for errors or printing rates
     if str(response_tollguru).find('message')==-1:
-        print(*response_tollguru['route']['costs'].items(),end="\n\n")
         return(response_tollguru['route']['costs'])
     else:
         raise Exception(response_tollguru['message'])
