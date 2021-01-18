@@ -2,13 +2,14 @@ require 'HTTParty'
 require 'json'
 require_relative 'flex_polyline'
 require "fast_polylines"
+require "cgi"
 
 START_LOC = "Dallas, TX"
 END_LOC = "New York, NY"
 KEY = ENV['HERE_KEY']
 
 def get_coord_hash(loc)
-    geocoding_url = "https://geocode.search.hereapi.com/v1/geocode?q=#{loc}&apiKey=#{KEY}"
+    geocoding_url = "https://geocode.search.hereapi.com/v1/geocode?q=#{CGI::escape(loc)}&apiKey=#{KEY}"
     coord = JSON.parse(HTTParty.get(geocoding_url).body)
     return (coord['items'].pop)['position']
 end
