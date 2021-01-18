@@ -64,14 +64,15 @@ def get_rates_from_tollguru(polyline):
 '''Testing'''
 #Importing Functions
 from csv import reader,writer
+import time
 temp_list=[]
 with open('testCases.csv','r') as f:
     csv_reader=reader(f)
     for count,i in enumerate(csv_reader):
         #if count>2:
-        #  break
+        # break
         if count==0:
-            i.extend(("Polyline","TollGuru_Rates"))
+            i.extend(("Input_polyline","Tollguru_Tag_Cost","Tollguru_Cash_Cost","Tollguru_QueryTime_In_Sec"))
         else:
             try:
                 source_latitude,source_longitude=get_geocodes_from_here_maps(i[1])
@@ -81,14 +82,25 @@ with open('testCases.csv','r') as f:
             except:
                 i.append("Routing Error") 
             
+            start=time.time()
             try:
                 rates=get_rates_from_tollguru(polyline)
             except:
                 i.append(False)
+            time_taken=(time.time()-start)
             if rates=={}:
-                i.append("NO_TOLL")
+                i.append((None,None))
             else:
-                i.append(rates['tag'])
+                try:
+                    tag=rates['tag']
+                except:
+                    tag=None
+                try:
+                    cash=rates['cash']
+                except :
+                    cash=None
+                i.extend((tag,cash))
+            i.append(time_taken)
         #print(f"{len(i)}   {i}\n")
         temp_list.append(i)
 
