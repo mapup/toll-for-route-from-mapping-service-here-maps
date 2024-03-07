@@ -12,11 +12,18 @@ TOLLGURU_API_KEY = os.environ.get("TOLLGURU_API_KEY")  # API key for Tollguru
 TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2"
 POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service"
 
-
-"""Fetching geocodes form here maps"""
+# Explore https://tollguru.com/toll-api-docs to get best of all the parameter that tollguru has to offer
+request_parameters = {
+    "vehicle": {
+        "type": "2AxlesAuto",
+    },
+    # Visit https://en.wikipedia.org/wiki/Unix_time to know the time format
+    "departure_time": "2021-01-05T09:46:08Z",
+}
 
 
 def get_geocodes_from_here_maps(address):
+    """Fetching geocodes form here maps"""
     url = "https://geocoder.ls.hereapi.com/6.2/geocode.json"
     para = {"searchtext": address, "apiKey": HERE_API_KEY}
     response_from_here = requests.get(url, params=para).json()
@@ -26,12 +33,10 @@ def get_geocodes_from_here_maps(address):
     return (latitude, longitude)
 
 
-"""Fetching Polyline from Here Maps"""
-
-
 def get_polyline_from_here_maps(
     source_latitude, source_longitude, destination_latitude, destination_longitude
 ):
+    """Fetching Polyline from Here Maps"""
     # Query Here Maps with Key and Source-Destination coordinates
     url = "{a}?transportMode=car&origin={b},{c}&destination={d},{e}&apiKey={f}&return=polyline".format(
         a=HERE_API_URL,
@@ -60,11 +65,9 @@ def get_rates_from_tollguru(polyline):
     # Tollguru resquest parameters
     headers = {"Content-type": "application/json", "x-api-key": TOLLGURU_API_KEY}
     params = {
-        # explore https://tollguru.com/developers/docs/ to get best off all the parameter that tollguru offers
+        **request_parameters,
         "source": "here",
         "polyline": polyline,  #  this is polyline that we fetched from the mapping service
-        "vehicleType": "2AxlesAuto",  #'''Visit https://tollguru.com/developers/docs/#vehicle-types to know more options'''
-        "departure_time": "2021-01-05T09:46:08Z",  #'''Visit https://en.wikipedia.org/wiki/Unix_time to know the time format'''
     }
 
     # Requesting Tollguru with parameters
