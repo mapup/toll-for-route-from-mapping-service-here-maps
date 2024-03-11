@@ -4,12 +4,26 @@ require_relative 'flex_polyline'
 require "fast_polylines"
 require 'cgi'
 
+HERE_API_KEY = ENV["HERE_API_KEY"]  # API key for Here Maps
+HERE_API_URL = "https://router.hereapi.com/v8/routes"
+HERE_GEOCODE_API_URL = "https://geocode.search.hereapi.com/v1/geocode"
 
-$key = ENV['HERE_KEY']
+TOLLGURU_API_KEY = ENV["TOLLGURU_API_KEY"]  # API key for Tollguru
+TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2"
+POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service"
+
+# Explore https://tollguru.com/toll-api-docs to get the best of all the parameters that tollguru has to offer
+request_parameters = {
+  "vehicle": {
+    "type": "2AxlesAuto",
+  },
+  # Visit https://en.wikipedia.org/wiki/Unix_time to know the time format
+  "departure_time": "2021-01-05T09:46:08Z",
+}
 
 def get_toll_rate(source,destination)
     def get_coord_hash(loc)
-        geocoding_url = "https://geocode.search.hereapi.com/v1/geocode?q=#{CGI::escape(loc)}&apiKey=#{$key}"
+        geocoding_url = "#{HERE_GEOCODE_API_URL}?q=#{CGI::escape(loc)}&apiKey=#{HERE_API_KEY}"
         coord = HTTParty.get(geocoding_url)
         begin
             return (JSON.parse(coord.body)['items'].pop)['position']
@@ -25,7 +39,7 @@ def get_toll_rate(source,destination)
 
     # GET Request to HERE Maps for Polyline
 
-    here_url = "https://router.hereapi.com/v8/routes?transportMode=car&origin=#{source["lat"]},#{source["lng"]}&destination=#{destination["lat"]},#{destination["lng"]}&apiKey=#{$key}&return=polyline"
+    here_url = "#{HERE_API_URL}?transportMode=car&origin=#{source["lat"]},#{source["lng"]}&destination=#{destination["lat"]},#{destination["lng"]}&apiKey=#{HERE_API_KEY}&return=polyline"
     response = HTTParty.get(here_url)
     begin
         if response.response.code == '200'
@@ -44,10 +58,13 @@ def get_toll_rate(source,destination)
     end
 
     # Sending POST request to TollGuru
-    tollguru_url = 'https://dev.tollguru.com/v1/calc/route'
-    tollguru_key = ENV['TOLLGURU_KEY']
-    headers = {'content-type' => 'application/json', 'x-api-key' => tollguru_key}
-    body = {'source' => "here", 'polyline' => google_encoded_polyline, 'vehicleType' => "2AxlesAuto", 'departure_time' => "2021-01-05T09:46:08Z"}
+    tollguru_url = "#{TOLLGURU_API_URL}/#{POLYLINE_ENDPOINT}"
+    headers = {'content-type': 'application/json', 'x-api-key': TOLLGURU_API_KEY}
+    body = {
+      'source': "esri",
+      'polyline': google_encoded_polyline,
+      **request_parameters,
+    }
     tollguru_response = HTTParty.post(tollguru_url,:body => body.to_json, :headers => headers, :timeout => 400)
     begin
         toll_body = JSON.parse(tollguru_response.body)    
