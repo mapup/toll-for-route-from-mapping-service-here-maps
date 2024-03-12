@@ -181,7 +181,7 @@ function encodeUnsignedNumber(val) {
 
 function encodeScaledValue(value) {
     // Transform a integer `value` into a variable length sequence of characters.
-    //   `appender` is a callable where the produced chars will land to
+    // `appender` is a callable where the produced chars will land to
     let numVal = Num(value);
     const negative = numVal < 0;
     numVal <<= Num(1);
@@ -195,7 +195,6 @@ function encodeScaledValue(value) {
 module.exports = {
     encode,
     decode,
-
     ABSENT,
     LEVEL,
     ALTITUDE,

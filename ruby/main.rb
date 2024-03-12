@@ -12,6 +12,7 @@ TOLLGURU_API_KEY = ENV["TOLLGURU_API_KEY"]  # API key for Tollguru
 TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2"
 POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service"
 
+# From and To locations
 source = 'Philadelphia, PA'
 destination = 'New York, NY'
 
@@ -36,7 +37,6 @@ source = get_coord_hash(source)
 destination = get_coord_hash(destination)
 
 # GET Request to HERE Maps for Polyline
-
 HERE_URL = "#{HERE_API_URL}?transportMode=car&origin=#{source["lat"]},#{source["lng"]}&destination=#{destination["lat"]},#{destination["lng"]}&apiKey=#{HERE_API_KEY}&return=polyline"
 RESPONSE = HTTParty.get(HERE_URL).body
 json_parsed = JSON.parse(RESPONSE)
