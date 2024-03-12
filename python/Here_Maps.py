@@ -13,6 +13,7 @@ TOLLGURU_API_KEY = os.environ.get("TOLLGURU_API_KEY")  # API key for Tollguru
 TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2"
 POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service"
 
+# From and To locations
 source = "Philadelphia, PA"
 destination = "New York, NY"
 
@@ -25,7 +26,6 @@ request_parameters = {
     "departure_time": "2021-01-05T09:46:08Z",
 }
 
-
 def get_geocodes_from_here_maps(address):
     """Fetching geocodes form Here maps"""
     params = {"searchtext": address, "apiKey": HERE_API_KEY}
@@ -34,7 +34,6 @@ def get_geocodes_from_here_maps(address):
         "Location"
     ]["DisplayPosition"].values()
     return (latitude, longitude)
-
 
 def get_polyline_from_here_maps(
     source_latitude, source_longitude, destination_latitude, destination_longitude
@@ -60,10 +59,7 @@ def get_polyline_from_here_maps(
     )  # we converted that to encoded(google) polyline
     return polyline_from_heremaps
 
-
-"""Calling Tollguru API"""
-
-
+# Calling Tollguru API
 def get_rates_from_tollguru(polyline):
     # Tollguru resquest parameters
     headers = {"Content-type": "application/json", "x-api-key": TOLLGURU_API_KEY}

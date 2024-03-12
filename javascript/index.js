@@ -42,12 +42,9 @@ const getPoints = body => body.routes
 
 const getPolyline = body => polyline.encode(getPoints(JSON.parse(body)));
 
-
 const getRoute = (cb) => request.get(url, cb);
 
 const handleRoute = (e, r, body) => {
-  console.log(body)
-
   const _polyline = getPolyline(body);
   console.log(_polyline);
 
