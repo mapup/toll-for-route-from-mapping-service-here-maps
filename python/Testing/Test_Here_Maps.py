@@ -23,12 +23,10 @@ request_parameters = {
 
 def get_geocodes_from_here_maps(address):
     """Fetching geocodes form here maps"""
-    url = "https://geocoder.ls.hereapi.com/6.2/geocode.json"
-    para = {"searchtext": address, "apiKey": HERE_API_KEY}
+    url = "https://geocode.search.hereapi.com/v1/geocode"
+    para = {"q": address, "apiKey": HERE_API_KEY}
     response_from_here = requests.get(url, params=para).json()
-    latitude, longitude = response_from_here["Response"]["View"][0]["Result"][0][
-        "Location"
-    ]["DisplayPosition"].values()
+    latitude, longitude = response_from_here["items"][0]["position"].values()
     return (latitude, longitude)
 
 def get_polyline_from_here_maps(

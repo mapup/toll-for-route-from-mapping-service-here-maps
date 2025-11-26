@@ -7,7 +7,7 @@ import os
 
 HERE_API_KEY = os.environ.get("HERE_API_KEY")  # API key for Here Maps
 HERE_API_URL = "https://router.hereapi.com/v8/routes"
-HERE_GEOCODE_API_URL = "https://geocoder.ls.hereapi.com/6.2/geocode.json"
+HERE_GEOCODE_API_URL = "https://geocode.search.hereapi.com/v1/geocode"
 
 TOLLGURU_API_KEY = os.environ.get("TOLLGURU_API_KEY")  # API key for Tollguru
 TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2"
@@ -18,7 +18,9 @@ source = "Philadelphia, PA"
 destination = "New York, NY"
 
 # Explore https://tollguru.com/toll-api-docs to get best of all the parameter that tollguru has to offer
+# Refer https://github.com/mapup/tollguru-api-parameter-examples/tree/main/request-bodies/02-Complete-Polyline-To-Toll for more examples
 request_parameters = {
+    # For vehicle types refer https://tollguru.com/toll-api-docs#vehicle-types-supported-by-tollguru
     "vehicle": {
         "type": "2AxlesAuto",
     },
@@ -28,11 +30,9 @@ request_parameters = {
 
 def get_geocodes_from_here_maps(address):
     """Fetching geocodes form Here maps"""
-    params = {"searchtext": address, "apiKey": HERE_API_KEY}
+    params = {"q": address, "apiKey": HERE_API_KEY}
     response_from_here = requests.get(HERE_GEOCODE_API_URL, params=params).json()
-    latitude, longitude = response_from_here["Response"]["View"][0]["Result"][0][
-        "Location"
-    ]["DisplayPosition"].values()
+    latitude, longitude = response_from_here["items"][0]["position"].values()
     return (latitude, longitude)
 
 def get_polyline_from_here_maps(
