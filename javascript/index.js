@@ -2,6 +2,7 @@ require('dotenv').config();
 const request = require("request");
 const polyline = require("polyline");
 const flexPoly = require("./flex_poly");
+const fs = require("fs");
 
 const HERE_API_KEY = process.env.HERE_API_KEY;
 const HERE_API_URL = "https://router.hereapi.com/v8/routes";
@@ -9,6 +10,30 @@ const HERE_API_URL = "https://router.hereapi.com/v8/routes";
 const TOLLGURU_API_KEY = process.env.TOLLGURU_API_KEY;
 const TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2";
 const POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service";
+
+/* ===================================================================
+   READ INPUT FROM FILE
+   =================================================================== */
+
+let inputData;
+try {
+  const inputFile = fs.readFileSync('./input.json', 'utf8');
+  inputData = JSON.parse(inputFile);
+  console.log("✓ Input file loaded successfully");
+  console.log("Description:", inputData.description);
+} catch (error) {
+  console.error("Error reading input.json:", error.message);
+  console.error("Please make sure input.json exists and is valid JSON");
+  process.exit(1);
+}
+
+// Extract configuration from input file
+const source = inputData.source;
+const destination = inputData.destination;
+const requestParameters = {
+  vehicle: inputData.vehicle,
+  departure_time: inputData.departure_time
+};
 
 /* ===================================================================
    HELPER FUNCTIONS
@@ -92,40 +117,7 @@ const processLocation = async (userInput) => {
 };
 
 /* ===================================================================
-   CONFIGURE YOUR SOURCE AND DESTINATION
-   =================================================================== */
-
-// Option 1: Use coordinates directly (lat/lng)
-// const source = { latitude: 39.95222, longitude: -75.16218 }; // Philadelphia, PA
-// const destination = { latitude: 40.7128, longitude: -74.0060 }; // New York, NY
-
-// Option 2: Use addresses (will be geocoded automatically)
-// const source = { address: "Philadelphia, PA" };
-// const destination = { address: "New York, NY" };
-
-// Option 3: Mix both - coordinates for one, address for another
-// const source = { latitude: 39.95222, longitude: -75.16218 };
-// const destination = { address: "New York, NY" };
-
-// Option 4: Provide full street addresses
-const source = { address: "1600 Amphitheatre Parkway, Mountain View, CA" };
-const destination = { address: "1 Apple Park Way, Cupertino, CA" };
-
-/* ===================================================================
-   REQUEST PARAMETERS
-   Explore https://github.com/mapup/tollguru-api-parameter-examples/tree/main for all available options
-   =================================================================== */
-
-const requestParameters = {
-  "vehicle": {
-    "type": "2AxlesAuto",
-  },
-  // Visit https://en.wikipedia.org/wiki/Unix_time to know the time format
-  "departure_time": "2021-01-05T09:46:08Z",
-}
-
-/* ===================================================================
-   ROUTE PROCESSING FUNCTIONS (Original Pattern)
+   ROUTE PROCESSING FUNCTIONS
    =================================================================== */
 
 const flatten = (arr, x) => arr.concat(x);
@@ -168,8 +160,16 @@ const getRoute = (cb) => {
 };
 
 const handleRoute = (e, r, body) => {
+  const outputData = {
+    timestamp: new Date().toISOString(),
+    input: inputData,
+    result: {}
+  };
+
   if (e) {
     console.error("Error fetching route:", e);
+    outputData.result.error = "Error fetching route: " + e.message;
+    writeOutput(outputData);
     return;
   }
 
@@ -179,6 +179,8 @@ const handleRoute = (e, r, body) => {
     // Check if routes exist in the response
     if (!routeData.routes || routeData.routes.length === 0) {
       console.error("No routes found in response:", body);
+      outputData.result.error = "No routes found in response";
+      writeOutput(outputData);
       return;
     }
 
@@ -201,14 +203,38 @@ const handleRoute = (e, r, body) => {
       (e, r, body) => {
         if (e) {
           console.error("Error calling Tollguru API:", e);
+          outputData.result.error = "Error calling Tollguru API: " + e.message;
+          writeOutput(outputData);
           return;
         }
         console.log("Tollguru Response:", body);
+
+        try {
+          outputData.result.tollguruResponse = JSON.parse(body);
+          outputData.result.success = true;
+          writeOutput(outputData);
+        } catch (parseError) {
+          outputData.result.error = "Error parsing Tollguru response";
+          outputData.result.rawResponse = body;
+          writeOutput(outputData);
+        }
       }
     )
   } catch (parseError) {
     console.error("Error parsing route response:", parseError);
     console.error("Response body:", body);
+    outputData.result.error = "Error parsing route response: " + parseError.message;
+    writeOutput(outputData);
+  }
+};
+
+// Function to write output to file
+const writeOutput = (data) => {
+  try {
+    fs.writeFileSync('./output.json', JSON.stringify(data, null, 2));
+    console.log("\n✓ Results written to output.json");
+  } catch (error) {
+    console.error("Error writing to output.json:", error.message);
   }
 };
 

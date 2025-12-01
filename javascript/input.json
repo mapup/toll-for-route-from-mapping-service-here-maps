@@ -1,0 +1,15 @@
+{
+  "description": "Philadelphia to New York using coordinates",
+  "source": {
+    "latitude": 39.95222,
+    "longitude": -75.16218
+  },
+  "destination": {
+    "latitude": 40.7128,
+    "longitude": -74.0060
+  },
+  "vehicle": {
+    "type": "2AxlesAuto"
+  },
+  "departure_time": "2021-01-05T09:46:08Z"
+}
