@@ -12,6 +12,50 @@ const TOLLGURU_API_URL = "https://apis.tollguru.com/toll/v2";
 const POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service";
 
 /* ===================================================================
+   VEHICLE TYPE MAPPING
+   =================================================================== */
+
+// Maps TollGuru vehicle types to HERE Maps transport modes
+const tollGuruTypeToCategory = {
+  // Car / SUV / Pickup / EV / similar
+  "2AxlesAuto":   "car",
+  "3AxlesAuto":   "car",
+  "4AxlesAuto":   "car",
+  "2AxlesDualTire": "car",
+  "3AxlesDualTire": "car",
+  "4AxlesDualTire": "car",
+  "2AxlesEV":    "car",
+  "3AxlesEV":    "car",
+  "4AxlesEV":    "car",
+
+  // Rideshare/Taxi/Carpool
+  "2AxlesTNC":   "car",
+  "2AxlesTNCPool": "car",
+  "2AxlesTaxi":  "car",
+  "2AxlesTaxiPool": "car",
+  "Carpool2":    "car",
+  "Carpool3":    "car",
+
+  // Truck
+  "2AxlesTruck": "truck",
+  "3AxlesTruck": "truck",
+  "4AxlesTruck": "truck",
+  "5AxlesTruck": "truck",
+  "6AxlesTruck": "truck",
+  "7AxlesTruck": "truck",
+  "8AxlesTruck": "truck",
+  "9AxlesTruck": "truck",
+
+  // Bus
+  "2AxlesBus":   "bus",
+  "3AxlesBus":   "bus",
+
+  "2AxlesRv":   "car",  // RVs are treated as cars for HERE Maps
+  "3AxlesRv":   "car",
+  "4AxlesRv":   "car",
+};
+
+/* ===================================================================
    READ INPUT FROM FILE
    =================================================================== */
 
@@ -35,6 +79,11 @@ const requestParameters = {
   departure_time: inputData.departure_time
 };
 
+// Add locTimes if provided
+if (inputData.locTimes) {
+  requestParameters.locTimes = inputData.locTimes;
+}
+
 /* ===================================================================
    HELPER FUNCTIONS
    =================================================================== */
@@ -44,6 +93,26 @@ const requestParameters = {
  */
 const containsAlphanumeric = (str) => {
   return /[a-zA-Z0-9]/.test(str);
+};
+
+/**
+ * Gets the HERE Maps transport mode from TollGuru vehicle type
+ * Defaults to 'car' if the vehicle type is not found in the mapping
+ */
+const getTransportMode = (vehicleType) => {
+  if (!vehicleType) {
+    console.warn("No vehicle type provided, defaulting to 'car'");
+    return 'car';
+  }
+
+  const transportMode = tollGuruTypeToCategory[vehicleType];
+
+  if (!transportMode) {
+    console.warn(`Unknown vehicle type '${vehicleType}', defaulting to 'car'`);
+    return 'car';
+  }
+
+  return transportMode;
 };
 
 /**
@@ -82,6 +151,13 @@ const geocodeAddress = async (address) => {
       }
     });
   });
+};
+
+/**
+ * Converts ISO timestamp string to Unix epoch timestamp (seconds)
+ */
+const isoToEpoch = (isoTimestamp) => {
+  return Math.floor(new Date(isoTimestamp).getTime() / 1000);
 };
 
 /**
@@ -143,8 +219,12 @@ const getRoute = (cb) => {
     console.log("Source:", processedSource);
     console.log("Destination:", processedDestination);
 
+    // Get transport mode from vehicle type
+    const transportMode = getTransportMode(inputData.vehicle?.type);
+    console.log("Transport mode:", transportMode);
+
     const url = `${HERE_API_URL}?${new URLSearchParams({
-      transportMode: 'car',
+      transportMode: transportMode,
       origin: `${processedSource.latitude},${processedSource.longitude}`,
       destination: `${processedDestination.latitude},${processedDestination.longitude}`,
       apiKey: HERE_API_KEY,
@@ -187,6 +267,38 @@ const handleRoute = (e, r, body) => {
     const _polyline = getPolyline(body);
     console.log("Polyline:", _polyline);
 
+    // Extract departure and arrival times from the route
+    const firstSection = routeData.routes[0].sections[0];
+    const departureTime = firstSection.departure.time;
+    const arrivalTime = firstSection.arrival.time;
+
+    console.log("Departure time:", departureTime);
+    console.log("Arrival time:", arrivalTime);
+
+    // Convert ISO timestamps to Unix epoch
+    const departureEpoch = isoToEpoch(departureTime);
+    const arrivalEpoch = isoToEpoch(arrivalTime);
+
+    console.log("Departure epoch:", departureEpoch);
+    console.log("Arrival epoch:", arrivalEpoch);
+
+    // Get polyline points to determine the last index
+    const polylinePoints = getPoints(routeData);
+    const lastIndex = polylinePoints.length - 1;
+
+    console.log("Polyline points count:", polylinePoints.length);
+    console.log("Last index:", lastIndex);
+
+    // Create locTimes array: [[start_index, start_time], [end_index, end_time]]
+    const locTimes = [[0, departureEpoch], [lastIndex, arrivalEpoch]];
+    console.log("LocTimes:", locTimes);
+
+    // Add locTimes to request parameters
+    const tollguruRequestParams = {
+      ...requestParameters,
+      locTimes: locTimes
+    };
+
     request.post(
       {
         url: `${TOLLGURU_API_URL}/${POLYLINE_ENDPOINT}`,
@@ -197,7 +309,7 @@ const handleRoute = (e, r, body) => {
         body: JSON.stringify({
           source: "here",
           polyline: _polyline,
-          ...requestParameters,
+          ...tollguruRequestParams,
         })
       },
       (e, r, body) => {
