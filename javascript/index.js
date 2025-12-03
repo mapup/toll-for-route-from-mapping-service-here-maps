@@ -75,8 +75,7 @@ try {
 const source = inputData.source;
 const destination = inputData.destination;
 const requestParameters = {
-  vehicle: inputData.vehicle,
-  departure_time: inputData.departure_time
+  vehicle: inputData.vehicle
 };
 
 // Add locTimes if provided
@@ -128,7 +127,6 @@ const geocodeAddress = async (address) => {
     });
 
     const geocodeUrl = `${geocodingAPI}?${params.toString()}`;
-    console.log("Geocode query URL:", geocodeUrl);
 
     request.get(geocodeUrl, (error, response, body) => {
       if (error) {
@@ -138,7 +136,6 @@ const geocodeAddress = async (address) => {
 
       try {
         const geocodedResponse = JSON.parse(body);
-        console.log("Geocoded response:", geocodedResponse);
 
         if (!geocodedResponse.items || geocodedResponse.items.length === 0) {
           return reject(new Error("Invalid address - no results found"));
@@ -158,6 +155,28 @@ const geocodeAddress = async (address) => {
  */
 const isoToEpoch = (isoTimestamp) => {
   return Math.floor(new Date(isoTimestamp).getTime() / 1000);
+};
+
+/**
+ * Generates locTimes array from HERE Maps actions
+ * @param {Array} actions - Array of actions from HERE Maps response
+ * @param {number} departureEpoch - Departure time in Unix epoch seconds
+ * @returns {Array} locTimes array in format [[offset, timestamp], ...]
+ */
+const generateLocTimes = (actions, departureEpoch) => {
+  const locTimes = [];
+  let cumulativeTime = departureEpoch;
+
+  // Generate locTimes for each action
+  for (let i = 0; i < actions.length; i++) {
+    const action = actions[i];
+    // Add current action's offset and cumulative timestamp
+    locTimes.push([action.offset, cumulativeTime]);
+    // Add duration to cumulative time for next action
+    cumulativeTime += action.duration;
+  }
+
+  return locTimes;
 };
 
 /**
@@ -228,7 +247,7 @@ const getRoute = (cb) => {
       origin: `${processedSource.latitude},${processedSource.longitude}`,
       destination: `${processedDestination.latitude},${processedDestination.longitude}`,
       apiKey: HERE_API_KEY,
-      return: 'polyline',
+      return: 'polyline,actions'
     }).toString()}`;
 
     console.log("Fetching route from HERE Maps...");
@@ -265,7 +284,6 @@ const handleRoute = (e, r, body) => {
     }
 
     const _polyline = getPolyline(body);
-    console.log("Polyline:", _polyline);
 
     // Extract departure and arrival times from the route
     const firstSection = routeData.routes[0].sections[0];
@@ -282,22 +300,32 @@ const handleRoute = (e, r, body) => {
     console.log("Departure epoch:", departureEpoch);
     console.log("Arrival epoch:", arrivalEpoch);
 
-    // Get polyline points to determine the last index
-    const polylinePoints = getPoints(routeData);
-    const lastIndex = polylinePoints.length - 1;
+    // Extract actions from the first section
+    const actions = firstSection.actions;
+    console.log("Number of actions:", actions.length);
 
-    console.log("Polyline points count:", polylinePoints.length);
-    console.log("Last index:", lastIndex);
-
-    // Create locTimes array: [[start_index, start_time], [end_index, end_time]]
-    const locTimes = [[0, departureEpoch], [lastIndex, arrivalEpoch]];
-    console.log("LocTimes:", locTimes);
+    // Generate locTimes from actions
+    const locTimes = generateLocTimes(actions, departureEpoch);
+    console.log("Generated locTimes with", locTimes.length, "entries");
 
     // Add locTimes to request parameters
     const tollguruRequestParams = {
       ...requestParameters,
       locTimes: locTimes
     };
+
+    // Construct the payload for TollGuru API
+    const tollguruPayload = {
+      source: "here",
+      polyline: _polyline,
+      ...tollguruRequestParams,
+    };
+
+    console.log("\n========================================");
+    console.log("PAYLOAD SENT TO TOLLGURU API:");
+    console.log("========================================");
+    console.log(JSON.stringify(tollguruPayload, null, 2));
+    console.log("========================================\n");
 
     request.post(
       {
@@ -306,11 +334,7 @@ const handleRoute = (e, r, body) => {
           'content-type': 'application/json',
           'x-api-key': TOLLGURU_API_KEY
         },
-        body: JSON.stringify({
-          source: "here",
-          polyline: _polyline,
-          ...tollguruRequestParams,
-        })
+        body: JSON.stringify(tollguruPayload)
       },
       (e, r, body) => {
         if (e) {
@@ -319,7 +343,6 @@ const handleRoute = (e, r, body) => {
           writeOutput(outputData);
           return;
         }
-        console.log("Tollguru Response:", body);
 
         try {
           outputData.result.tollguruResponse = JSON.parse(body);
