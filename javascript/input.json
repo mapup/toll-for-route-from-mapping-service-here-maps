@@ -1,15 +1,12 @@
 {
-  "description": "Philadelphia to New York using coordinates",
+  "description": "Route with tolls - New York to Philadelphia",
   "source": {
-    "latitude": 39.95222,
-    "longitude": -75.16218
+    "address": "New York, NY"
   },
   "destination": {
-    "latitude": 40.7128,
-    "longitude": -74.0060
+    "address": "Philadelphia, PA"
   },
   "vehicle": {
     "type": "2AxlesAuto"
-  },
-  "departure_time": "2021-01-05T09:46:08Z"
+  }
 }
