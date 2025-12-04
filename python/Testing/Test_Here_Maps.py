@@ -5,9 +5,12 @@ import flexpolyline as fp
 import polyline as poly
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from root .env file
+# This allows sharing the same .env across javascript, python, and other folders
+env_path = Path(__file__).parent.parent.parent / '.env'
+load_dotenv(dotenv_path=env_path)
 
 HERE_API_KEY = os.environ.get("HERE_API_KEY")  # API key for Here Maps
 HERE_API_URL = "https://router.hereapi.com/v8/routes"
@@ -167,17 +170,60 @@ def get_rates_from_tollguru(polyline, loc_times=None, vehicle_type="2AxlesAuto")
         params["locTimes"] = loc_times
 
     # Requesting Tollguru with parameters
-    response_tollguru = requests.post(
+    response = requests.post(
         f"{TOLLGURU_API_URL}/{POLYLINE_ENDPOINT}",
         json=params,
         headers=headers,
-    ).json()
+    )
 
-    # checking for errors or printing rates
-    if str(response_tollguru).find("message") == -1:
-        return response_tollguru["route"]["costs"]
-    else:
-        raise Exception(response_tollguru["message"])
+    # Check HTTP status code
+    if response.status_code != 200:
+        # Log the error details
+        print(f"\n  ❌ TollGuru API Error:")
+        print(f"     Status Code: {response.status_code}")
+
+        # Try to parse JSON response
+        try:
+            response_data = response.json()
+            if 'code' in response_data:
+                print(f"     Error Code: {response_data['code']}")
+            if 'value' in response_data:
+                print(f"     Error Message: {response_data['value']}")
+            if 'message' in response_data:
+                print(f"     Message: {response_data['message']}")
+            print(f"\n     Full Response Body:")
+            print(f"     {json.dumps(response_data, indent=2)}")
+        except:
+            print(f"     Raw Response: {response.text}")
+
+        # Log the payload that was sent
+        print(f"\n  Payload sent to TollGuru:")
+        print(f"     URL: {TOLLGURU_API_URL}/{POLYLINE_ENDPOINT}")
+        print(f"     Vehicle Type: {vehicle_type}")
+        print(f"     Polyline: {polyline[:100]}..." if len(polyline) > 100 else f"     Polyline: {polyline}")
+        print(f"     Polyline Length: {len(polyline)} chars")
+        print(f"     Number of locTimes: {len(loc_times) if loc_times else 0}")
+
+        # Print full request body for debugging
+        print(f"\n     Full Request Body:")
+        request_body_copy = params.copy()
+        if 'polyline' in request_body_copy and len(request_body_copy['polyline']) > 200:
+            request_body_copy['polyline'] = request_body_copy['polyline'][:200] + '... (truncated)'
+        if 'locTimes' in request_body_copy and len(request_body_copy['locTimes']) > 5:
+            request_body_copy['locTimes'] = request_body_copy['locTimes'][:5] + ['... (truncated)']
+        print(f"     {json.dumps(request_body_copy, indent=2)}")
+
+        # Raise exception with error details
+        try:
+            response_data = response.json()
+            error_msg = response_data.get('value', response_data.get('message', response_data.get('code', 'Unknown error')))
+        except:
+            error_msg = f"HTTP {response.status_code}: {response.text}"
+        raise Exception(error_msg)
+
+    # Return costs from successful response
+    response_data = response.json()
+    return response_data["route"]["costs"]
 
 """Testing"""
 # Importing Functions
@@ -204,22 +250,18 @@ with open("testCases.csv", "r") as f:
                 )
             )
         else:
-            print(f"\n[Test {count}] Processing route: {i[1]} → {i[2]}")
+            print(f"\n[Test {count}] {i[1]} → {i[2]}")
 
             try:
                 # Get vehicle type from CSV (index 4), default to 2AxlesAuto if not provided
                 vehicle_type = i[4] if len(i) > 4 and i[4] else "2AxlesAuto"
-                print(f"  Vehicle type: {vehicle_type}")
 
-                print(f"  Geocoding source...")
                 source_latitude, source_longitude = get_geocodes_from_here_maps(i[1])
-                print(f"  Geocoding destination...")
                 (
                     destination_latitude,
                     destination_longitude,
                 ) = get_geocodes_from_here_maps(i[2])
 
-                print(f"  Fetching route from HERE Maps...")
                 # Get polyline and HERE response
                 polyline, here_response = get_polyline_from_here_maps(
                     source_latitude,
@@ -237,7 +279,6 @@ with open("testCases.csv", "r") as f:
                 # Convert departure time to Unix epoch and generate locTimes
                 departure_epoch = iso_to_epoch(departure_time)
                 loc_times = generate_loc_times(actions, departure_epoch)
-                print(f"  Generated {len(loc_times)} location timestamps")
 
                 i.append(polyline)
             except Exception as e:
@@ -245,16 +286,15 @@ with open("testCases.csv", "r") as f:
                 i.append("Routing Error")
                 loc_times = None
 
-            print(f"  Calling TollGuru API...")
             start = time.time()
             try:
                 # Pass locTimes and vehicle_type to Tollguru API
                 rates = get_rates_from_tollguru(polyline, loc_times, vehicle_type)
             except Exception as e:
-                print(f"  ❌ TollGuru API Error: {e}")
                 i.append(False)
                 rates = {}
             time_taken = time.time() - start
+
             if rates == {}:
                 i.append((None, None))
             else:
@@ -267,9 +307,8 @@ with open("testCases.csv", "r") as f:
                 except:
                     cash = None
                 i.extend((tag, cash))
-                print(f"  ✓ Tag cost: ${tag if tag else 'N/A'}, Cash cost: ${cash if cash else 'N/A'}")
+                print(f"  ✓ Tag: ${tag if tag else 'N/A'} | Cash: ${cash if cash else 'N/A'} | {time_taken:.2f}s")
             i.append(time_taken)
-            print(f"  Query completed in {time_taken:.2f}s")
         # print(f"{len(i)}   {i}\n")
         temp_list.append(i)
 

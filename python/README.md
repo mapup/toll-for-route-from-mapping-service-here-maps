@@ -149,14 +149,26 @@ deactivate
 
 ## Environment Variables
 
-Create a `.env` file in the `python` directory with your API keys:
+This project uses a **centralized `.env` file** located at the **root directory** (parent of the python folder). This allows sharing the same credentials across JavaScript, Python, and other implementations.
+
+### Setup
+
+The `.env` file should already exist at the root level:
 
 ```bash
-HERE_API_KEY=your_here_maps_api_key_here
+# File location: toll-for-route-from-mapping-service-here-maps/.env
+# (NOT in the python folder)
+
 TOLLGURU_API_KEY=your_tollguru_api_key_here
+HERE_API_KEY=your_here_maps_api_key_here
 ```
 
-**Important:** Never commit your `.env` file to version control. It should be in `.gitignore`.
+**Important:**
+- The `.env` file is at the **root level**, not in the python folder
+- It's already added to `.gitignore` and should **never** be committed to version control
+- All Python scripts automatically load from the root `.env` file
+- Get your TollGuru API key from: https://tollguru.com/developers/get-api-key
+- Get your HERE Maps API key from: https://developer.here.com/
 
 ## Running the Scripts
 
@@ -192,7 +204,7 @@ The `Testing` folder contains `Test_Here_Maps.py` which processes multiple route
 ```bash
 cd Testing
 
-# Make sure .env file exists in Testing directory
+# Make sure .env file exists at the root directory
 # Run the test script (use python or python3 depending on your system)
 python Test_Here_Maps.py
 # or
