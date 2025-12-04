@@ -54,13 +54,9 @@ TOLLGURU_TYPE_TO_CATEGORY = {
 }
 
 # Explore https://tollguru.com/toll-api-docs to get best of all the parameter that tollguru has to offer
-request_parameters = {
-    "vehicle": {
-        "type": "2AxlesAuto",
-    },
-    # Visit https://en.wikipedia.org/wiki/Unix_time to know the time format
-    "departure_time": "2021-01-05T09:46:08Z",
-}
+# Note: Vehicle type is read dynamically from testCases.csv for each test case
+# Note: departure_time removed - we now use locTimes generated from HERE Maps response
+request_parameters = {}
 
 def get_transport_mode(vehicle_type):
     """Gets the HERE Maps transport mode from TollGuru vehicle type"""
@@ -81,6 +77,29 @@ def iso_to_epoch(iso_timestamp):
     from datetime import datetime
     dt = datetime.fromisoformat(iso_timestamp.replace('Z', '+00:00'))
     return int(dt.timestamp())
+
+def generate_loc_times(actions, departure_epoch):
+    """
+    Generates locTimes array from HERE Maps actions
+
+    Args:
+        actions: Array of actions from HERE Maps response
+        departure_epoch: Departure time in Unix epoch seconds
+
+    Returns:
+        locTimes array in format [[offset, timestamp], ...]
+    """
+    loc_times = []
+    cumulative_time = departure_epoch
+
+    # Generate locTimes for each action
+    for action in actions:
+        # Add current action's offset and cumulative timestamp
+        loc_times.append([action['offset'], cumulative_time])
+        # Add duration to cumulative time for next action
+        cumulative_time += action['duration']
+
+    return loc_times
 
 def get_geocodes_from_here_maps(address):
     """Fetching geocodes form here maps"""
@@ -103,12 +122,13 @@ def get_geocodes_from_here_maps(address):
 def get_polyline_from_here_maps(
     source_latitude, source_longitude, destination_latitude, destination_longitude, vehicle_type="2AxlesAuto"
 ):
-    """Fetching Polyline and route data from Here Maps"""
+    """Fetching Polyline, Actions, and route data from Here Maps"""
     # Get transport mode from vehicle type
     transport_mode = get_transport_mode(vehicle_type)
 
     # Query Here Maps with Key and Source-Destination coordinates
-    url = "{a}?transportMode={b}&origin={c},{d}&destination={e},{f}&apiKey={g}&return=polyline".format(
+    # Note: We request both polyline and actions
+    url = "{a}?transportMode={b}&origin={c},{d}&destination={e},{f}&apiKey={g}&return=polyline,actions".format(
         a=HERE_API_URL,
         b=transport_mode,
         c=source_latitude,
@@ -126,49 +146,20 @@ def get_polyline_from_here_maps(
     decoded_polyline = fp.decode(flex_polyline_here)
     polyline_from_heremaps = poly.encode(decoded_polyline)  # we converted that to encoded(google) polyline
 
-    # Return both the polyline and the full response for time extraction
-    return polyline_from_heremaps, response, len(decoded_polyline)
-
-def create_loc_times(here_response, polyline_length):
-    """Extract departure and arrival times and create locTimes array"""
-    try:
-        first_section = here_response["routes"][0]["sections"][0]
-        departure_time = first_section["departure"]["time"]
-        arrival_time = first_section["arrival"]["time"]
-
-        print(f"Departure time: {departure_time}")
-        print(f"Arrival time: {arrival_time}")
-
-        # Convert to epoch timestamps
-        departure_epoch = iso_to_epoch(departure_time)
-        arrival_epoch = iso_to_epoch(arrival_time)
-
-        print(f"Departure epoch: {departure_epoch}")
-        print(f"Arrival epoch: {arrival_epoch}")
-
-        # Last index is polyline_length - 1
-        last_index = polyline_length - 1
-
-        print(f"Polyline points count: {polyline_length}")
-        print(f"Last index: {last_index}")
-
-        # Create locTimes array: [[start_index, start_time], [end_index, end_time]]
-        loc_times = [[0, departure_epoch], [last_index, arrival_epoch]]
-        print(f"LocTimes: {loc_times}")
-
-        return loc_times
-    except Exception as e:
-        print(f"Error creating locTimes: {e}")
-        return None
+    # Return polyline and full response for actions and time extraction
+    return polyline_from_heremaps, response
 
 """Calling Tollguru API"""
-def get_rates_from_tollguru(polyline, loc_times=None):
+def get_rates_from_tollguru(polyline, loc_times=None, vehicle_type="2AxlesAuto"):
     # Tollguru resquest parameters
     headers = {"Content-type": "application/json", "x-api-key": TOLLGURU_API_KEY}
     params = {
         **request_parameters,
         "source": "here",
         "polyline": polyline,  #  this is polyline that we fetched from the mapping service
+        "vehicle": {
+            "type": vehicle_type,
+        },
     }
 
     # Add locTimes if provided
@@ -193,6 +184,10 @@ def get_rates_from_tollguru(polyline, loc_times=None):
 from csv import reader, writer
 import time
 
+print("=" * 60)
+print("Starting toll calculation tests...")
+print("=" * 60)
+
 temp_list = []
 with open("testCases.csv", "r") as f:
     csv_reader = reader(f)
@@ -209,18 +204,24 @@ with open("testCases.csv", "r") as f:
                 )
             )
         else:
+            print(f"\n[Test {count}] Processing route: {i[1]} → {i[2]}")
+
             try:
                 # Get vehicle type from CSV (index 4), default to 2AxlesAuto if not provided
                 vehicle_type = i[4] if len(i) > 4 and i[4] else "2AxlesAuto"
+                print(f"  Vehicle type: {vehicle_type}")
 
+                print(f"  Geocoding source...")
                 source_latitude, source_longitude = get_geocodes_from_here_maps(i[1])
+                print(f"  Geocoding destination...")
                 (
                     destination_latitude,
                     destination_longitude,
                 ) = get_geocodes_from_here_maps(i[2])
 
-                # Get polyline, HERE response, and polyline length
-                polyline, here_response, polyline_length = get_polyline_from_here_maps(
+                print(f"  Fetching route from HERE Maps...")
+                # Get polyline and HERE response
+                polyline, here_response = get_polyline_from_here_maps(
                     source_latitude,
                     source_longitude,
                     destination_latitude,
@@ -228,20 +229,29 @@ with open("testCases.csv", "r") as f:
                     vehicle_type,
                 )
 
-                # Create locTimes from HERE response
-                loc_times = create_loc_times(here_response, polyline_length)
+                # Extract actions and departure time from HERE Maps response
+                first_section = here_response["routes"][0]["sections"][0]
+                actions = first_section["actions"]
+                departure_time = first_section["departure"]["time"]
+
+                # Convert departure time to Unix epoch and generate locTimes
+                departure_epoch = iso_to_epoch(departure_time)
+                loc_times = generate_loc_times(actions, departure_epoch)
+                print(f"  Generated {len(loc_times)} location timestamps")
 
                 i.append(polyline)
             except Exception as e:
-                print(f"Routing Error: {e}")
+                print(f"  ❌ Routing Error: {e}")
                 i.append("Routing Error")
                 loc_times = None
 
+            print(f"  Calling TollGuru API...")
             start = time.time()
             try:
-                # Pass locTimes to Tollguru API
-                rates = get_rates_from_tollguru(polyline, loc_times)
-            except:
+                # Pass locTimes and vehicle_type to Tollguru API
+                rates = get_rates_from_tollguru(polyline, loc_times, vehicle_type)
+            except Exception as e:
+                print(f"  ❌ TollGuru API Error: {e}")
                 i.append(False)
                 rates = {}
             time_taken = time.time() - start
@@ -257,11 +267,18 @@ with open("testCases.csv", "r") as f:
                 except:
                     cash = None
                 i.extend((tag, cash))
+                print(f"  ✓ Tag cost: ${tag if tag else 'N/A'}, Cash cost: ${cash if cash else 'N/A'}")
             i.append(time_taken)
+            print(f"  Query completed in {time_taken:.2f}s")
         # print(f"{len(i)}   {i}\n")
         temp_list.append(i)
 
 with open("testCases_result.csv", "w") as f:
     writer(f).writerows(temp_list)
+
+print("\n" + "=" * 60)
+print(f"Testing complete! Processed {len(temp_list) - 1} test cases.")
+print(f"Results saved to: testCases_result.csv")
+print("=" * 60)
 
 """Testing Ends"""
