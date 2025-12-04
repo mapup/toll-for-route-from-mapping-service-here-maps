@@ -1,6 +1,26 @@
 # toll-here-maps
 Click on the folders above to see examples to extend mapping capabilities of Here by adding toll information from [**TollGuru**](https://tollguru.com/) to the route information from Here.
 
+## Environment Setup
+
+This project uses a **centralized `.env` file** at the root level that is shared across all implementations (JavaScript, Python, Ruby).
+
+### Create `.env` file at the root directory:
+
+```bash
+# In the root directory (toll-for-route-from-mapping-service-here-maps/)
+# Create a .env file with your API keys:
+
+TOLLGURU_API_KEY=your_tollguru_api_key_here
+HERE_API_KEY=your_here_maps_api_key_here
+```
+
+**Important:**
+- The `.env` file is already added to `.gitignore` and should **never** be committed to version control
+- All folders (javascript, python, ruby) will automatically load credentials from this single `.env` file
+- Get your TollGuru API key from: https://tollguru.com/developers/get-api-key
+- Get your HERE Maps API key from: https://developer.here.com/
+
 The toll information has following [key features](https://tollguru.com/developers/features):
 ### Support for [geographies](https://github.com/mapup/tollguru_country_coverage/wiki/Countries-supported-by-TollGuru) 
 * North America - Bahamas, Belize, Canada, Costa Rica, Cuba, Dominican Republic, Guatemala, Honduras, Jamaica, Mexico, Panama, Puerto Rico, United States of America

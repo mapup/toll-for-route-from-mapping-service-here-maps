@@ -1,4 +1,6 @@
-require('dotenv').config();
+// Load environment variables from root .env file
+// This allows sharing the same .env across javascript, python, and other folders
+require('dotenv').config({ path: '../.env' });
 const request = require("request");
 const polyline = require("polyline");
 const flexPoly = require("./flex_poly");
