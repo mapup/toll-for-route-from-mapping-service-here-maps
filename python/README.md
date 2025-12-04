@@ -1,4 +1,311 @@
-# [HERE](https://developer.here.com/)
+# HERE Maps + TollGuru Python Integration
+
+Get toll rates for routes using HERE Maps routing and TollGuru toll calculation APIs.
+
+## Table of Contents
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Environment Variables](#environment-variables)
+- [Running the Scripts](#running-the-scripts)
+- [Testing](#testing)
+- [API Endpoints Used](#api-endpoints-used)
+- [API Documentation](#api-documentation)
+
+## Prerequisites
+
+- Python 3.7 or higher
+- pip (Python package installer)
+- HERE Maps API key
+- TollGuru API key
+
+## Installation
+
+### 1. Install Python (if not already installed)
+
+#### Check if Python is installed
+
+Open your terminal/command prompt and run:
+
+```bash
+python --version
+```
+
+or
+
+```bash
+python3 --version
+```
+
+If you see a version number (e.g., `Python 3.x.x`), Python is already installed. Skip to step 2.
+
+#### Installing Python
+
+**On macOS:**
+```bash
+# Using Homebrew (recommended)
+brew install python3
+
+# Or download from python.org
+# Visit https://www.python.org/downloads/macos/
+```
+
+**On Linux (Ubuntu/Debian):**
+```bash
+sudo apt update
+sudo apt install python3 python3-pip python3-venv
+```
+
+**On Linux (CentOS/RHEL):**
+```bash
+sudo yum install python3 python3-pip
+```
+
+**On Windows:**
+- Download the installer from https://www.python.org/downloads/windows/
+- Run the installer
+- **Important:** Check the box "Add Python to PATH" during installation
+- Click "Install Now"
+
+#### Verify pip is installed
+
+After installing Python, verify pip is available:
+
+```bash
+pip --version
+```
+
+or
+
+```bash
+pip3 --version
+```
+
+**Note on pip vs pip3:**
+- If you have only Python 3 installed, use `pip`
+- If you have both Python 2 and Python 3, use `pip3` for Python 3 packages
+- Similarly, use `python` or `python3` based on your system
+
+For the rest of this guide:
+- Replace `python3` with `python` if that's what works on your system
+- Replace `pip3` with `pip` if that's what works on your system
+
+### 2. Create a Virtual Environment
+
+Creating a virtual environment helps isolate project dependencies from your system Python installation.
+
+**On macOS/Linux:**
+```bash
+# Navigate to the python directory
+cd python
+
+# Create a virtual environment
+python3 -m venv venv
+
+# Activate the virtual environment
+source venv/bin/activate
+```
+
+**On Windows:**
+```cmd
+# Navigate to the python directory
+cd python
+
+# Create a virtual environment
+python -m venv venv
+
+# Activate the virtual environment
+venv\Scripts\activate
+```
+
+You should see `(venv)` in your terminal prompt, indicating the virtual environment is active.
+
+### 3. Install Required Dependencies
+
+With the virtual environment activated, install all required Python packages:
+
+**If using pip:**
+```bash
+pip install -r requirements.txt
+```
+
+**If using pip3:**
+```bash
+pip3 install -r requirements.txt
+```
+
+This will install:
+- `requests` - For making HTTP API calls
+- `flexpolyline` - For decoding HERE Maps flexible polylines
+- `polyline` - For encoding polylines
+- `python-dotenv` - For loading environment variables from .env file
+
+### 4. Deactivating the Virtual Environment
+
+When you're done working, you can deactivate the virtual environment:
+
+```bash
+deactivate
+```
+
+## Environment Variables
+
+Create a `.env` file in the `python` directory with your API keys:
+
+```bash
+HERE_API_KEY=your_here_maps_api_key_here
+TOLLGURU_API_KEY=your_tollguru_api_key_here
+```
+
+**Important:** Never commit your `.env` file to version control. It should be in `.gitignore`.
+
+## Running the Scripts
+
+### Main Script
+
+The main script (`Here_Maps.py`) calculates tolls for a single route:
+
+```bash
+# Make sure your virtual environment is activated
+source venv/bin/activate  # On macOS/Linux
+# or
+venv\Scripts\activate  # On Windows
+
+You can modify the source and destination in the script:
+```python
+source = "Philadelphia, PA"
+destination = "New York, NY"
+```
+
+### Output
+
+The script will display:
+- API request payload sent to TollGuru
+- API response received from TollGuru
+- Toll costs for different payment methods (tag, cash, etc.)
+
+## Testing
+
+The `Testing` folder contains `Test_Here_Maps.py` which processes multiple routes from a CSV file.
+
+### Running Tests
+
+```bash
+cd Testing
+
+# Make sure .env file exists in Testing directory
+# Run the test script (use python or python3 depending on your system)
+python Test_Here_Maps.py
+# or
+python3 Test_Here_Maps.py
+```
+
+### Input File Format
+
+The test script reads from `testCases.csv` with the following columns:
+- Test case ID
+- Source address
+- Destination address
+- Departure time (optional)
+- Vehicle type (optional, defaults to "2AxlesAuto")
+
+### Output
+
+Results are saved to `testCases_result.csv` with additional columns:
+- Input polyline
+- TollGuru tag cost
+- TollGuru cash cost
+- Query time in seconds
+
+The script also displays detailed logs including:
+- Departure/arrival times
+- Polyline information
+- LocTimes array
+- TollGuru API request payload
+- TollGuru API response
+
+---
+
+# API Endpoints Used
+
+This project uses the following API endpoints:
+
+## HERE Maps API Endpoints
+
+### 1. Geocoding API
+**Endpoint:** `https://geocode.search.hereapi.com/v1/geocode`
+
+**Purpose:** Converts addresses to geographic coordinates (latitude, longitude)
+
+**Method:** GET
+
+**Parameters:**
+- `q` - Address to geocode (e.g., "Philadelphia, PA")
+- `apiKey` - Your HERE Maps API key
+
+**Used in:**
+- `get_geocodes_from_here_maps()` function
+
+### 2. Routing API
+**Endpoint:** `https://router.hereapi.com/v8/routes`
+
+**Purpose:** Calculates routes between two points and returns polyline data
+
+**Method:** GET
+
+**Parameters:**
+- `transportMode` - Type of transport (car, truck, bus)
+- `origin` - Starting coordinates (latitude,longitude)
+- `destination` - Ending coordinates (latitude,longitude)
+- `apiKey` - Your HERE Maps API key
+- `return` - Data to return (polyline)
+
+**Used in:**
+- `get_polyline_from_here_maps()` function
+
+## TollGuru API Endpoint
+
+### Complete Polyline API
+**Endpoint:** `https://apis.tollguru.com/toll/v2/complete-polyline-from-mapping-service`
+
+**Purpose:** Calculates toll costs for a route based on polyline data
+
+**Method:** POST
+
+**Headers:**
+- `Content-type: application/json`
+- `x-api-key: YOUR_TOLLGURU_API_KEY`
+
+**Request Body:**
+```json
+{
+  "source": "here",
+  "polyline": "encoded_polyline_string",
+  "vehicle": {
+    "type": "2AxlesAuto"
+  },
+  "departure_time": "2021-01-05T09:46:08Z",
+  "locTimes": [[0, 1764665410], [872, 1764669484]]
+}
+```
+
+**Parameters:**
+- `source` - Mapping service name (here, google, mapbox, etc.)
+- `polyline` - Encoded polyline string from mapping service
+- `vehicle.type` - Vehicle type (see [TollGuru vehicle types](https://tollguru.com/toll-api-docs#vehicle-types-supported-by-tollguru))
+- `departure_time` - ISO 8601 timestamp (optional but recommended)
+- `locTimes` - Array of [index, timestamp] pairs for accurate time-based tolls (optional)
+
+**Used in:**
+- `get_rates_from_tollguru()` function
+
+**Response:**
+Returns toll costs in different payment methods (tag, cash, license plate, etc.)
+
+---
+
+# API Documentation
+
+## [HERE Maps](https://developer.here.com/)
 
 ### Get API key to access HERE Maps APIs (if you have an API key skip this)
 #### Step 1: Login/Singup
