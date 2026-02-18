@@ -210,18 +210,22 @@ def get_rates_from_tollguru(polyline, loc_times=None):
         print(f"\nPayload sent to TollGuru:")
         print(f"   URL: {url}")
         print(f"   Vehicle Type: {params.get('vehicle', {}).get('type', 'N/A')}")
-        print(f"   Polyline: {polyline[:100]}..." if len(polyline) > 100 else f"   Polyline: {polyline}")
         print(f"   Polyline Length: {len(polyline)} chars")
         print(f"   Number of locTimes: {len(loc_times) if loc_times else 0}")
 
         # Print full request body for debugging
         print(f"\n   Full Request Body:")
         request_body_copy = params.copy()
-        if 'polyline' in request_body_copy and len(request_body_copy['polyline']) > 200:
-            request_body_copy['polyline'] = request_body_copy['polyline'][:200] + '... (truncated)'
-        if 'locTimes' in request_body_copy and len(request_body_copy['locTimes']) > 5:
-            request_body_copy['locTimes'] = request_body_copy['locTimes'][:5] + ['... (truncated)']
-        print(f"   {json.dumps(request_body_copy, indent=2)}")
+        try:
+            # Redact sensitive fields
+            if 'polyline' in request_body_copy:
+                request_body_copy['polyline'] = "REDACTED"
+            if 'locTimes' in request_body_copy:
+                # Keep count but redact content
+                request_body_copy['locTimes'] = f"Array of {len(request_body_copy['locTimes'])} items (REDACTED)"
+            print(f"   {json.dumps(request_body_copy, indent=2)}")
+        except Exception:
+            print("   (Could not safely print request body)")
 
         # Raise exception with error details
         try:
