@@ -1,10 +1,10 @@
 {
-  "description": "Route with tolls - New York to Philadelphia",
+  "description": "Route with tolls - New York to Boston",
   "source": {
     "address": "New York, NY"
   },
   "destination": {
-    "address": "Philadelphia, PA"
+    "address": "Boston, MA"
   },
   "vehicle": {
     "type": "2AxlesAuto"

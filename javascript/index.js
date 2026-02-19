@@ -1,7 +1,7 @@
 // Load environment variables from root .env file
 // This allows sharing the same .env across javascript, python, and other folders
 require('dotenv').config({ path: '../.env' });
-const request = require("request");
+const axios = require("axios");
 const polyline = require("polyline");
 const flexPoly = require("./flex_poly");
 const fs = require("fs");
@@ -20,23 +20,23 @@ const POLYLINE_ENDPOINT = "complete-polyline-from-mapping-service";
 // Maps TollGuru vehicle types to HERE Maps transport modes
 const tollGuruTypeToCategory = {
   // Car / SUV / Pickup / EV / similar
-  "2AxlesAuto":   "car",
-  "3AxlesAuto":   "car",
-  "4AxlesAuto":   "car",
+  "2AxlesAuto": "car",
+  "3AxlesAuto": "car",
+  "4AxlesAuto": "car",
   "2AxlesDualTire": "car",
   "3AxlesDualTire": "car",
   "4AxlesDualTire": "car",
-  "2AxlesEV":    "car",
-  "3AxlesEV":    "car",
-  "4AxlesEV":    "car",
+  "2AxlesEV": "car",
+  "3AxlesEV": "car",
+  "4AxlesEV": "car",
 
   // Rideshare/Taxi/Carpool
-  "2AxlesTNC":   "car",
+  "2AxlesTNC": "car",
   "2AxlesTNCPool": "car",
-  "2AxlesTaxi":  "car",
+  "2AxlesTaxi": "car",
   "2AxlesTaxiPool": "car",
-  "Carpool2":    "car",
-  "Carpool3":    "car",
+  "Carpool2": "car",
+  "Carpool3": "car",
 
   // Truck
   "2AxlesTruck": "truck",
@@ -49,12 +49,12 @@ const tollGuruTypeToCategory = {
   "9AxlesTruck": "truck",
 
   // Bus
-  "2AxlesBus":   "bus",
-  "3AxlesBus":   "bus",
+  "2AxlesBus": "bus",
+  "3AxlesBus": "bus",
 
-  "2AxlesRv":   "car",  // RVs are treated as cars for HERE Maps
-  "3AxlesRv":   "car",
-  "4AxlesRv":   "car",
+  "2AxlesRv": "car",  // RVs are treated as cars for HERE Maps
+  "3AxlesRv": "car",
+  "4AxlesRv": "car",
 };
 
 /* ===================================================================
@@ -77,13 +77,10 @@ try {
 const source = inputData.source;
 const destination = inputData.destination;
 const requestParameters = {
-  vehicle: inputData.vehicle
+  vehicle: {
+    type: inputData.vehicle?.type || "2AxlesAuto"
+  }
 };
-
-// Add locTimes if provided
-if (inputData.locTimes) {
-  requestParameters.locTimes = inputData.locTimes;
-}
 
 /* ===================================================================
    HELPER FUNCTIONS
@@ -122,34 +119,25 @@ const getTransportMode = (vehicleType) => {
 const geocodeAddress = async (address) => {
   const geocodingAPI = "https://geocode.search.hereapi.com/v1/geocode";
 
-  return new Promise((resolve, reject) => {
-    const params = new URLSearchParams({
-      q: address,
-      apiKey: HERE_API_KEY
-    });
-
-    const geocodeUrl = `${geocodingAPI}?${params.toString()}`;
-
-    request.get(geocodeUrl, (error, response, body) => {
-      if (error) {
-        console.error("Error executing geocoding request:", error);
-        return reject(new Error("Unable to geocode the address"));
-      }
-
-      try {
-        const geocodedResponse = JSON.parse(body);
-
-        if (!geocodedResponse.items || geocodedResponse.items.length === 0) {
-          return reject(new Error("Invalid address - no results found"));
-        }
-
-        resolve(geocodedResponse);
-      } catch (err) {
-        console.error("Error parsing geocoding response:", err);
-        reject(new Error("Unable to parse geocoding response"));
+  try {
+    const response = await axios.get(geocodingAPI, {
+      params: {
+        q: address,
+        apiKey: HERE_API_KEY
       }
     });
-  });
+
+    const geocodedResponse = response.data;
+
+    if (!geocodedResponse.items || geocodedResponse.items.length === 0) {
+      throw new Error("Invalid address - no results found");
+    }
+
+    return geocodedResponse;
+  } catch (error) {
+    console.error("Error executing geocoding request:", error.message);
+    throw new Error("Unable to geocode the address");
+  }
 };
 
 /**
@@ -228,15 +216,32 @@ const getPoints = body => body.routes
   .map(x => x.polyline)
   .reduce(flatten)
 
-const getPolyline = body => polyline.encode(getPoints(JSON.parse(body)));
+const getPolyline = body => polyline.encode(getPoints(body));
 
-const getRoute = (cb) => {
-  // Process locations first, then build URL and make request
-  Promise.all([
-    processLocation(source),
-    processLocation(destination)
-  ])
-  .then(([processedSource, processedDestination]) => {
+// Function to write output to file
+const writeOutput = (data) => {
+  try {
+    fs.writeFileSync('./output.json', JSON.stringify(data, null, 2));
+    console.log("\n✓ Results written to output.json");
+  } catch (error) {
+    console.error("Error writing to output.json:", error.message);
+  }
+};
+
+const getRoute = async () => {
+  const outputData = {
+    timestamp: new Date().toISOString(),
+    input: inputData,
+    result: {}
+  };
+
+  try {
+    // Process locations first
+    const [processedSource, processedDestination] = await Promise.all([
+      processLocation(source),
+      processLocation(destination)
+    ]);
+
     console.log("Source:", processedSource);
     console.log("Destination:", processedDestination);
 
@@ -244,48 +249,28 @@ const getRoute = (cb) => {
     const transportMode = getTransportMode(inputData.vehicle?.type);
     console.log("Transport mode:", transportMode);
 
-    const url = `${HERE_API_URL}?${new URLSearchParams({
-      transportMode: transportMode,
-      origin: `${processedSource.latitude},${processedSource.longitude}`,
-      destination: `${processedDestination.latitude},${processedDestination.longitude}`,
-      apiKey: HERE_API_KEY,
-      return: 'polyline,actions'
-    }).toString()}`;
-
     console.log("Fetching route from HERE Maps...");
-    request.get(url, cb);
-  })
-  .catch(error => {
-    console.error("Error processing locations:", error.message);
-  });
-};
+    const hereResponse = await axios.get(HERE_API_URL, {
+      params: {
+        transportMode: transportMode,
+        origin: `${processedSource.latitude},${processedSource.longitude}`,
+        destination: `${processedDestination.latitude},${processedDestination.longitude}`,
+        apiKey: HERE_API_KEY,
+        return: 'polyline,actions'
+      }
+    });
 
-const handleRoute = (e, r, body) => {
-  const outputData = {
-    timestamp: new Date().toISOString(),
-    input: inputData,
-    result: {}
-  };
-
-  if (e) {
-    console.error("Error fetching route:", e);
-    outputData.result.error = "Error fetching route: " + e.message;
-    writeOutput(outputData);
-    return;
-  }
-
-  try {
-    const routeData = JSON.parse(body);
+    const routeData = hereResponse.data;
 
     // Check if routes exist in the response
     if (!routeData.routes || routeData.routes.length === 0) {
-      console.error("No routes found in response:", body);
+      console.error("No routes found in response");
       outputData.result.error = "No routes found in response";
       writeOutput(outputData);
       return;
     }
 
-    const _polyline = getPolyline(body);
+    const _polyline = getPolyline(routeData);
 
     // Extract departure and arrival times from the route
     const firstSection = routeData.routes[0].sections[0];
@@ -310,69 +295,63 @@ const handleRoute = (e, r, body) => {
     const locTimes = generateLocTimes(actions, departureEpoch);
     console.log("Generated locTimes with", locTimes.length, "entries");
 
-    // Add locTimes to request parameters
-    const tollguruRequestParams = {
-      ...requestParameters,
-      locTimes: locTimes
-    };
-
     // Construct the payload for TollGuru API
+    // FIX: Explictly construct payload to avoid data leakage from inputData
     const tollguruPayload = {
       source: "here",
       polyline: _polyline,
-      ...tollguruRequestParams,
+      vehicle: {
+        type: requestParameters.vehicle.type
+      },
+      locTimes: locTimes
     };
 
     console.log("\n========================================");
     console.log("PAYLOAD SENT TO TOLLGURU API:");
     console.log("========================================");
-    console.log(JSON.stringify(tollguruPayload, null, 2));
+    // Redact large fields for display
+    const displayPayload = { ...tollguruPayload };
+    if (displayPayload.polyline && displayPayload.polyline.length > 100) {
+      displayPayload.polyline = displayPayload.polyline.substring(0, 100) + "...";
+    }
+    if (displayPayload.locTimes && displayPayload.locTimes.length > 5) {
+      displayPayload.locTimes = `Array of ${displayPayload.locTimes.length} items`;
+    }
+    console.log(JSON.stringify(displayPayload, null, 2));
     console.log("========================================\n");
 
-    request.post(
-      {
-        url: `${TOLLGURU_API_URL}/${POLYLINE_ENDPOINT}`,
-        headers: {
-          'content-type': 'application/json',
-          'x-api-key': TOLLGURU_API_KEY
-        },
-        body: JSON.stringify(tollguruPayload)
-      },
-      (e, r, body) => {
-        if (e) {
-          console.error("Error calling Tollguru API:", e);
-          outputData.result.error = "Error calling Tollguru API: " + e.message;
-          writeOutput(outputData);
-          return;
+    try {
+      const tollguruResponse = await axios.post(
+        `${TOLLGURU_API_URL}/${POLYLINE_ENDPOINT}`,
+        tollguruPayload,
+        {
+          headers: {
+            'content-type': 'application/json',
+            'x-api-key': TOLLGURU_API_KEY
+          }
         }
+      );
 
-        try {
-          outputData.result.tollguruResponse = JSON.parse(body);
-          outputData.result.success = true;
-          writeOutput(outputData);
-        } catch (parseError) {
-          outputData.result.error = "Error parsing Tollguru response";
-          outputData.result.rawResponse = body;
-          writeOutput(outputData);
-        }
+      outputData.result.tollguruResponse = tollguruResponse.data;
+      outputData.result.success = true;
+      writeOutput(outputData);
+
+    } catch (tollguruError) {
+      console.error("Error calling Tollguru API:", tollguruError.message);
+      if (tollguruError.response) {
+        console.error("Response data:", tollguruError.response.data);
+        outputData.result.error = "Error calling Tollguru API: " + JSON.stringify(tollguruError.response.data);
+      } else {
+        outputData.result.error = "Error calling Tollguru API: " + tollguruError.message;
       }
-    )
-  } catch (parseError) {
-    console.error("Error parsing route response:", parseError);
-    console.error("Response body:", body);
-    outputData.result.error = "Error parsing route response: " + parseError.message;
+      writeOutput(outputData);
+    }
+
+  } catch (error) {
+    console.error("Error processing route:", error.message);
+    outputData.result.error = "Error processing route: " + error.message;
     writeOutput(outputData);
   }
 };
 
-// Function to write output to file
-const writeOutput = (data) => {
-  try {
-    fs.writeFileSync('./output.json', JSON.stringify(data, null, 2));
-    console.log("\n✓ Results written to output.json");
-  } catch (error) {
-    console.error("Error writing to output.json:", error.message);
-  }
-};
-
-getRoute(handleRoute);
+getRoute();
